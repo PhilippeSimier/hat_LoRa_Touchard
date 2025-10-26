@@ -7,7 +7,12 @@
 
 #include "AprsClient.h"
 
-AprsClient::AprsClient() : sockfd(-1), connected(false), running(false) {
+AprsClient::AprsClient(bool _bidirectionnel) :
+    sockfd(-1),
+    bidirectionnel(_bidirectionnel),
+    connected(false),
+    running(false)
+{
 }
 
 AprsClient::~AprsClient() {
@@ -226,4 +231,46 @@ int AprsClient::computePasscode(const std::string& callsign) {
 
     return hash & 0x7FFF; // borne sur 15 bits 
 }
+
+// Fonction pour retransmettre les trames vers le serveur APRS-IS
+void AprsClient::retransmitFrame(const std::string& loraFrame) {
+
+    if (!connected)
+        throw std::runtime_error("Non connecté au serveur APRS-IS");
+
+    if (loraFrame.empty() || loraFrame[0] == '#')
+        throw std::runtime_error("retransmitFrame vide");
+
+    size_t pos_gt = loraFrame.find('>');
+    size_t pos_colon = loraFrame.find(':');
+
+    if (pos_gt == std::string::npos || pos_colon == std::string::npos)
+        throw std::runtime_error("Trame invalide ignorée");
+
+
+    // Extraire la partie avant ":" pour insérer le tag
+    std::string head = loraFrame.substr(0, pos_colon);
+    std::string data = loraFrame.substr(pos_colon); // incluant le ':'
+
+    // Vérifie si la trame vient déjà d’un iGate (contient qAR, qAO, etc.)
+    if (loraFrame.find("qAR") != std::string::npos ||
+        loraFrame.find("qAO") != std::string::npos ||
+        loraFrame.find("qAS") != std::string::npos)
+        throw std::runtime_error("Trame déjà marquée iGate, ignorée");
+
+
+    // Sélection du tag iGate
+    std::string tag = bidirectionnel ? "qAO" : "qAR";
+
+    std::string frameWithTag = head + ',' + tag  + ',' + callsign + data;
+    sendLine(frameWithTag);
+    std::cout << "[LoRa→APRS-IS] " << frameWithTag << std::endl;
+
+}
+
+
+
+
+
+
 

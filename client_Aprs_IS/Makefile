@@ -10,7 +10,7 @@ CXXFLAGS = -Wall -O2 -std=c++11
 LDFLAGS = -lwiringPi
 
 # Fichiers source
-SOURCES = main.cpp AprsClient.cpp APRSFrame.cpp Position.cpp GestionFile.cpp
+SOURCES = main.cpp AprsClient.cpp APRSFrame.cpp Position.cpp GestionFile.cpp SimpleIni.cpp
 
 # Fichiers objets
 OBJECTS = $(SOURCES:.cpp=.o)

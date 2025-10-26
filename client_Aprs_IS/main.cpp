@@ -13,6 +13,9 @@
 #include "AprsClient.h"
 #include "Position.h"
 #include "GestionFile.h"
+#include "SimpleIni.h"
+
+#define CONFIGURATION "/opt/configuration.ini"
 
 using namespace std;
 
@@ -27,32 +30,36 @@ void signalHandler(int signal);
 // Fonction callback appelée à chaque ligne reçue du serveur APRS-IS
 void onAprsMessageReceived(const std::string& message);
 
-// Fonction pour retransmettre les trames reçues de Lora vers le serveur APRS-IS
-void retransmitLoRaToAprsIs(AprsClient& aprs,
-                            const std::string& loraFrame,
-                            const std::string& igateCallsign);
-
-
-
 int main() {
     // enregistre le handler pour   SIGINT (Ctrl+C)
     std::signal(SIGINT, signalHandler);
+    SimpleIni ini;
+
 
     try {
 
+        ini.Load(CONFIGURATION);
+        string indicatif = ini.GetValue("aprs", "indicatif", "F4ABC");
+        double latitude = ini.GetValue<double>("beacon", "latitude", 48.0);
+        double longitude = ini.GetValue<double>("beacon", "longitude", 0.0);
+        double altitude = ini.GetValue<double>("beacon", "altitude", 1);
+        string comment = ini.GetValue<string>("beacon", "comment", "comment default");
+        char symbol_table = ini.GetValue<char>("beacon", "symbol_table", '/');
+        char symbol  = ini.GetValue<char>("beacon", "symbol", 'O');
+
         fileRX.obtenirFileIPC(5678);
 
-        // --- 1️Création du client APRS-IS ---
-        AprsClient aprs;
+        // --- 1️ Création du client APRS-IS bidirectionnel---
+        AprsClient aprs(true);
 
         // --- 2️ Connexion au serveur APRS-IS ---
         aprs.connectToServer("euro.aprs2.net", 14580);
 
         // --- 3️ Authentification avec un filtre---
-        aprs.authenticate("F4JRE-3", "r/48.01013/0.20614/100");
+        aprs.authenticate( indicatif, "r/48.01013/0.20614/20");
 
-        // --- 4️ Création d'une position pour apparaître sur la carte APRS ---
-        Position pos(48.01013, 0.20614, 85, 'I', '&', "C++ Client"); // latitude, longitude, altitude, symbole, commentaire
+        // --- 4️ Création d'une balise sur la carte APRS ---
+        Position pos(latitude, longitude, altitude, symbol_table, symbol, comment); // latitude, longitude, altitude, symbole, commentaire
 
         // --- 5️ Affichage du locator sur la console ---
         cout << "Locator : " << pos.getLocator(6) << endl;
@@ -71,8 +78,7 @@ int main() {
 
             message = fileRX.lireDansLaFileIPC(2);
             string loraFrame(message.text);
-            retransmitLoRaToAprsIs(aprs, loraFrame, "F4JRE-3");
-
+            aprs.retransmitFrame(loraFrame);
 
             this_thread::sleep_for(chrono::seconds(1));
         }
@@ -104,41 +110,7 @@ void onAprsMessageReceived(const std::string& message) {
     std::cout << "[APRS RX] " << message;
 }
 
-void retransmitLoRaToAprsIs(AprsClient& aprs,
-                            const std::string& loraFrame,
-                            const std::string& igateCallsign)
-{
-    if (loraFrame.empty() || loraFrame[0] == '#')
-        return;
 
-    size_t pos_gt = loraFrame.find('>');
-    size_t pos_colon = loraFrame.find(':');
-
-    if (pos_gt == std::string::npos || pos_colon == std::string::npos) {
-        std::cerr << "[LoRa] Trame invalide ignorée : " << loraFrame << std::endl;
-        return;
-    }
-
-    // Extraire la partie avant ":" pour insérer le tag
-    std::string head = loraFrame.substr(0, pos_colon);
-    std::string data = loraFrame.substr(pos_colon); // incluant le ':'
-
-    // Vérifie si un tag qAR est déjà présent
-    if (head.find("qAR") != std::string::npos) {
-        std::cout << "[LoRa] Trame déjà marquée iGate, ignorée : " << loraFrame << std::endl;
-        return;
-    }
-
-    // Ajout du tag iGate ",qAR,<callsign>"
-    std::string frameWithTag = head + ",qAR," + igateCallsign + data;
-
-    try {
-        aprs.sendLine(frameWithTag);
-        std::cout << "[LoRa→APRS-IS] " << frameWithTag << std::endl;
-    } catch (const std::runtime_error& e) {
-        std::cerr << "[LoRa→APRS-IS] Erreur d’envoi : " << e.what() << std::endl;
-    }
-}
 
 
 

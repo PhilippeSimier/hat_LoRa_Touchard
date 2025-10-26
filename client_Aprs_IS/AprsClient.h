@@ -38,13 +38,15 @@
 class AprsClient {
     
 public:
-    AprsClient();
+    AprsClient(bool _bidirectionnel  = false);
     ~AprsClient();
 
     void connectToServer(const std::string& host, int port);
     void authenticate(const std::string& callsign, const std::string& filter);
     void sendLine(const std::string& line);
     void sendPosition(Position& pos);
+    void retransmitFrame(const std::string& loraFrame);
+
     void disconnect();
 
     void startListening(std::function<void(const std::string&)> onMessage);
@@ -52,6 +54,8 @@ public:
 
 private:
     int sockfd;
+    bool bidirectionnel;
+
     std::atomic<bool> connected;
     std::atomic<bool> running;
     std::thread listenerThread;
@@ -65,6 +69,7 @@ private:
     std::string receiveAsync(int timeoutSec);
     void setNonBlocking(bool enable);
     bool reconnect();
+
     int computePasscode(const std::string& callsign);
 };
 
