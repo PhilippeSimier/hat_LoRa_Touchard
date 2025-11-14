@@ -4,13 +4,13 @@
 CXX = g++
 
 # Options de compilation
-CXXFLAGS = -Wall -O2 -std=c++11
+CXXFLAGS = -Wall -O2 -std=c++17
 
 # Options d'édition de liens
 LDFLAGS = -lwiringPi
 
 # Fichiers source
-SOURCES = main.cpp AprsClient.cpp APRSFrame.cpp Position.cpp GestionFile.cpp SimpleIni.cpp
+SOURCES = main.cpp AprsClient.cpp APRSFrame.cpp Position.cpp GestionFile.cpp SimpleIni.cpp Ws2812b.cpp
 
 # Fichiers objets
 OBJECTS = $(SOURCES:.cpp=.o)
